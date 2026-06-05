@@ -1,0 +1,17 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.vscode/
+.idea/
+
+# Never commit the commercial / private build artifacts
+# 切勿提交商业版与隐私文件
+worldcup.html
+worldcup_owner.html
+unlock_admin.html
+wechat_qr.png
+qr_b64.txt
+*.secret
