@@ -89,7 +89,7 @@
   .tabs{position:sticky;top:0;z-index:50;background:rgba(255,255,255,.88);
     backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid var(--line);}
   .tabs-inner{max-width:1140px;margin:0 auto;display:flex;gap:0;padding:0 16px;overflow-x:auto;
-    justify-content:center;}
+    justify-content:center;touch-action:pan-x;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;}
   .tabs-inner::-webkit-scrollbar{display:none}
   .tab{font-size:15px;font-weight:500;color:var(--muted);background:none;border:none;cursor:pointer;
     padding:13px 18px 11px;border-radius:0;white-space:nowrap;transition:.18s;
@@ -145,6 +145,15 @@
   .grp-pill{font-size:11px;font-weight:600;color:var(--blue);background:var(--blue-soft);
     border-radius:980px;padding:3px 11px;}
   .venue{font-size:12px;color:var(--faint);font-weight:500;}
+  .venue.tap{cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;}
+  .venue.tap:hover{color:var(--turquoise);}
+  .vmap-wrap{background:var(--bg2);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:16px;}
+  .vmap{width:100%;max-width:360px;margin:0 auto;display:block;}
+  .vmap-cap{font-size:11.5px;color:var(--faint);text-align:center;margin-top:8px;}
+  .vinfo{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+  .vinfo .vchip{font-size:12.5px;color:var(--muted);background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:6px 11px;}
+  .vinfo .vchip b{color:var(--txt);font-weight:600;}
+  .vlinks{display:flex;flex-direction:column;gap:8px;}
   .mtime{font-size:12px;color:var(--blue);font-weight:600;}
   .vs-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:14px;}
   .side{display:flex;align-items:center;gap:11px;cursor:pointer;border-radius:10px;padding:4px;transition:.15s;}
@@ -1182,7 +1191,7 @@ function renderSchedule(){
       const c=climateFor(v);
       return `<div class="match"><div class="match-top"><span class="grp-pill">${GP(g)}</span>
         ${bj?`<span class="mtime">${L(`🕐 北京 ${bj} · 美东 ${et}`,`🕐 BJ ${bj.replace('次日','+1d ')} · ET ${et}`)}</span>`:''}
-        <span class="venue">📍 ${VN(v)}</span></div>
+        <span class="venue tap" onclick="openVenue('${v.replace(/'/g,"\\'")}')">📍 ${VN(v)}</span></div>
         <div class="wx" id="wx-${di}-${mi}">${c?wxChip(c,false):''}</div>
         <div class="vs-row">
           <div class="side" onclick="openTeam('${h}')"><span class="flag">${TEAMS[h].f}</span>
@@ -1556,6 +1565,61 @@ function openTeam(name){
 function saveNote(name,val){try{localStorage.setItem("wc_note_"+name,val);}catch(e){noteCache[name]=val;}}
 function loadNote(name){try{const v=localStorage.getItem("wc_note_"+name);return v!=null?v:(noteCache[name]||"");}catch(e){return noteCache[name]||"";}}
 const noteCache={};
+/* ===== 场馆弹窗：离线 SVG 北美定位地图 + 场馆信息 + 外链 ===== */
+const MX_CITY=["墨西哥城","瓜达拉哈拉","蒙特雷"],CA_CITY=["多伦多","温哥华"];
+function cityCountry(k){return MX_CITY.indexOf(k)>=0?L("墨西哥","Mexico"):CA_CITY.indexOf(k)>=0?L("加拿大","Canada"):L("美国","USA");}
+// 北美轮廓（顺时针，[经度,纬度]），与城市点用同一投影 → 定位点自动对齐
+const NA_OUTLINE=[
+  [-124.5,48.4],[-123.1,49.0],[-114,49.0],[-95,49.0],[-87.5,48.0],[-83,45.8],[-82.5,43.6],
+  [-79,43.3],[-76.8,43.6],[-74.5,45.0],[-71,45.1],[-67,45.2],[-70,43.6],[-70.5,41.6],
+  [-74,40.5],[-75.5,38.6],[-76,37.0],[-75.8,35.5],[-78.5,33.9],[-81,31.3],[-80.4,27.0],
+  [-80.1,25.2],[-81.6,25.9],[-82.7,27.9],[-83.7,29.8],[-87,30.4],[-89.3,29.2],[-91,29.2],
+  [-93.8,29.7],[-97.1,27.9],[-97.5,26.0],[-97.7,22.3],[-96,19.2],[-94.5,18.2],[-91.5,18.6],
+  [-90.5,21.0],[-87,21.5],[-88,18.5],[-92,15.0],[-96,15.7],[-99.9,16.8],[-103.5,18.4],
+  [-105.7,20.6],[-105.7,23.2],[-109,23.0],[-110,24.2],[-112.3,26.5],[-114,28.0],[-117.1,32.5],
+  [-118.3,34.0],[-120.6,35.0],[-122,37.0],[-124,40.0],[-124,43.0],[-124.5,48.4]
+];
+function buildNAMap(hk){
+  const W=300,H=222,lo=-126,hi=-66,la0=14,la1=51;
+  const fx=lng=>((lng-lo)/(hi-lo))*W,fy=lat=>((la1-lat)/(la1-la0))*H;
+  const poly=NA_OUTLINE.map(p=>fx(p[0]).toFixed(1)+","+fy(p[1]).toFixed(1)).join(" ");
+  let dots="";
+  for(const k in CITY){if(k===hk)continue;const c=CITY[k];
+    dots+=`<circle cx="${fx(c.lng).toFixed(1)}" cy="${fy(c.lat).toFixed(1)}" r="2.4" fill="#b9b9c2"/>`;}
+  const c=CITY[hk],px=fx(c.lng),py=fy(c.lat),right=px<W-72;
+  const pin=`<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="11" fill="none" stroke="var(--coral)" stroke-width="1.5" opacity=".5"/>
+    <circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="6" fill="var(--coral)" stroke="#fff" stroke-width="2"/>
+    <text x="${(right?px+15:px-15).toFixed(1)}" y="${(py+4).toFixed(1)}" text-anchor="${right?'start':'end'}" font-size="12" font-weight="700" fill="var(--txt)">${CTN(hk)}</text>`;
+  return `<svg class="vmap" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="${poly}" fill="#eef0f3" stroke="#cfd2d8" stroke-width="1.2" stroke-linejoin="round"/>${dots}${pin}</svg>`;
+}
+function openVenue(v){
+  const k=venueCity(v);if(!k)return;const c=CITY[k];
+  const q=encodeURIComponent(VN(v)+" "+CTN(k)+L(" 世界杯 球场"," stadium world cup"));
+  const info=[
+    `<span class="vchip">${L('国家','Country')} <b>${cityCountry(k)}</b></span>`,
+    `<span class="vchip">${L('城市','City')} <b>${CTN(k)}</b></span>`,
+    c.roof?`<span class="vchip">🏟️ <b>${L('室内/可顶棚','Indoor/Roof')}</b></span>`:`<span class="vchip">☀️ <b>${L('露天','Open-air')}</b></span>`,
+    `<span class="vchip">🌡️ <b>${c.hi}°/${c.lo}°</b> ${L('6-7月','Jun-Jul')}</span>`,
+    `<span class="vchip">${CONDN(c.cond)}</span>`
+  ].join("");
+  document.getElementById("modal").innerHTML=`
+    <div class="modal-hero"><button class="modal-close" onclick="closeModal()">×</button>
+      <div class="modal-flag">📍</div><div class="modal-name">${VN(v)}</div>
+      <div class="modal-grp">${CTN(k)} · ${cityCountry(k)}</div></div>
+    <div class="modal-body">
+      <div class="vmap-wrap">${buildNAMap(k)}
+        <div class="vmap-cap">${L('在美 / 加 / 墨的大致位置（离线绘制，灰点为其余主办城市）','Approx. location in USA / Canada / Mexico (offline map; grey dots = other host cities)')}</div></div>
+      <div class="modal-sec-t">${L('场馆信息','Venue Info')}</div>
+      <div class="vinfo">${info}</div>
+      <div class="modal-sec-t">${L('查看更多','See More')}</div>
+      <div class="vlinks">
+        <a class="intel-a" target="_blank" rel="noopener" href="https://www.google.com/search?tbm=isch&q=${q}">${L('🖼️ 查看场馆照片','🖼️ Venue photos')}</a>
+        <a class="intel-a" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${c.lat},${c.lng}">${L('🗺️ 在地图中打开','🗺️ Open in Maps')}</a>
+      </div>
+    </div>`;
+  document.getElementById("overlay").classList.add("open");
+}
 function closeModal(){document.getElementById("overlay").classList.remove("open");}
 document.getElementById("overlay").addEventListener("click",e=>{if(e.target.id==="overlay")closeModal();});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
