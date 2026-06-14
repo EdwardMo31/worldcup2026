@@ -653,6 +653,35 @@
   .slide-tile.done{background:linear-gradient(160deg,var(--lime),var(--turquoise))}
   .game-hint{text-align:center;font-size:13px;color:var(--muted);margin-top:14px;line-height:1.6}
 
+  /* ── 阵容年龄结构（背景解读，不参与概率） ── */
+  .group-legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:12.5px;color:var(--muted);margin:-4px 0 16px;line-height:1.6}
+  .group-legend .lg-item{display:inline-flex;align-items:center;gap:6px}
+  .group-legend .age-chip,.group-legend .rate-chip{margin:0}
+  .group-legend b{color:var(--txt);font-weight:600}
+  .age-chip{font-size:11px;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px;flex:none}
+  .age-chip.young,.age-tag.young{background:rgba(22,191,191,.14);color:#0e8c8c}
+  .age-chip.prime,.age-tag.prime{background:rgba(0,113,227,.12);color:var(--accent)}
+  .age-chip.vet,.age-tag.vet{background:rgba(255,92,73,.14);color:#d63b27}
+  .age-tag{font-size:11px;padding:1px 7px;border-radius:8px;font-weight:600;white-space:nowrap}
+  .age-line{margin-top:8px;font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;align-items:center;gap:6px;line-height:1.7}
+  .age-line b{color:var(--txt)}
+  .age-cav{font-size:11px;opacity:.85;font-style:italic}
+  .age-legend{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0 4px;font-size:12px;color:var(--muted)}
+  .age-extreme{margin-left:auto}
+  .age-wrap{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+  .age-row{display:grid;grid-template-columns:26px 26px 1fr 90px 44px auto;align-items:center;gap:8px;padding:6px 8px;border-radius:10px;cursor:pointer;transition:.15s}
+  .age-row:hover{background:var(--bg2)}
+  .age-rk{font-size:12px;color:var(--muted);text-align:center}
+  .age-nm{font-size:14px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .age-nm small{color:var(--muted);font-weight:400;margin-left:5px;font-size:11px}
+  .age-track{height:8px;background:var(--bg2);border-radius:5px;overflow:hidden}
+  .age-track i{display:block;height:100%;border-radius:5px}
+  .age-track i.young{background:var(--turquoise)}
+  .age-track i.prime{background:var(--accent)}
+  .age-track i.vet{background:var(--coral)}
+  .age-val{font-size:13px;font-weight:700;text-align:right}
+  @media(max-width:560px){.age-row{grid-template-columns:22px 22px 1fr 44px auto}.age-track{display:none}.age-extreme{margin-left:0}}
+
 </style>
 </head>
 <body>
@@ -688,6 +717,7 @@
   <section id="groups" class="view active">
     <div class="lead" id="t-g-lead">12 个小组</div>
     <div class="lead-sub" id="t-g-sub">点击任意球队查看综合评分、出线概率、赛程强度与逐场分析。红色标记为模型识别出的"死亡之组"。</div>
+    <div class="group-legend" id="t-g-legend"></div>
     <div class="groups" id="groupsGrid"></div>
   </section>
 
@@ -725,6 +755,8 @@
       <div class="section-title" id="t-d-st2">小组难度 · 死亡之组识别</div>
       <div class="grp-diff" id="diffGrid"></div>
     </div>
+
+    <div class="analytic" id="ageCard"></div>
 
     <div class="analytic">
       <div class="section-title" id="t-d-sth">历史延续性 · 近三届淘汰赛履历（2014 / 2018 / 2022）</div>
@@ -918,6 +950,28 @@ const PROFILE={
   "塞内加尔":["非洲身体流标杆，攻防两端硬度足、转换快；进攻组织较依赖个别核心的发挥。","A benchmark for African athleticism, physically strong at both ends with quick transitions; attacking creation leans on key individuals."],
   "挪威":["顶级攻击核心领衔、纸面火力惊人；整体大赛经验与防线深度仍是问号。","Led by an elite attacking core with frightening firepower on paper; tournament experience and defensive depth remain question marks."],
 };
+// 各队 26 人名单平均年龄（人工快照，来源 rotowire，截至 2026-06；非官方实时，仅作阵容结构参考，不参与任何概率计算）
+const AGE={
+  "墨西哥":27.50,"南非":26.35,"韩国":27.46,"捷克":27.23,
+  "加拿大":26.42,"波斯尼亚和黑塞哥维那":25.92,"卡塔尔":28.92,"瑞士":27.81,
+  "巴西":28.65,"摩洛哥":25.92,"海地":27.08,"苏格兰":28.73,
+  "美国":26.42,"巴拉圭":28.54,"澳大利亚":26.88,"土耳其":27.23,
+  "德国":27.54,"库拉索":27.54,"科特迪瓦":25.35,"厄瓜多尔":25.58,
+  "荷兰":27.27,"日本":27.19,"瑞典":27.00,"突尼斯":26.15,
+  "比利时":27.12,"埃及":28.69,"伊朗":29.81,"新西兰":27.62,
+  "西班牙":26.19,"佛得角":29.23,"沙特阿拉伯":27.96,"乌拉圭":28.19,
+  "法国":26.58,"塞内加尔":26.62,"伊拉克":26.65,"挪威":26.35,
+  "阿根廷":28.62,"阿尔及利亚":26.46,"奥地利":28.12,"约旦":28.08,
+  "葡萄牙":27.54,"刚果民主共和国":28.50,"乌兹别克斯坦":27.96,"哥伦比亚":29.58,
+  "英格兰":26.62,"克罗地亚":27.88,"加纳":26.42,"巴拿马":30.00,
+};
+// 年龄结构定性标签：<26.5 年轻化 / 26.5–28 当打之年 / >28 经验型（纯描述，无预测含义）
+function ageTag(a){
+  if(a<26.5)return{cls:"young",zh:"年轻化",en:"Young"};
+  if(a<=28)return{cls:"prime",zh:"当打之年",en:"Prime"};
+  return{cls:"vet",zh:"经验型",en:"Veteran"};
+}
+function ageTagN(a){const t=ageTag(a);return L(t.zh,t.en);}
 
 /* ============ I18N（中文 / English 同文件切换） ============ */
 let LANG="zh";
@@ -1009,7 +1063,8 @@ const UI={
   "t-m4":["揭幕战","Opening match"],
   "t-m5":["决赛日","Final day"],
   "t-g-lead":["12 个小组","12 Groups"],
-  "t-g-sub":["点击任意球队查看综合评分、出线概率、赛程强度与逐场分析。红色标记为模型识别出的“死亡之组”。","Tap any team for its overall rating, qualification odds, fixture strength and match-by-match analysis. Red marks the model-identified “group of death”."],
+  "t-g-sub":["点击任意球队查看综合评分、出线概率、赛程强度与逐场分析。红色标记为模型识别出的「死亡之组」。","Tap any team for its overall rating, qualification odds, fixture strength and match-by-match analysis. Red marks the model-identified group of death."],
+  "t-g-legend":["<span class='lg-item'><span class='age-chip prime'>26.5</span>= <b>平均年龄</b>（阵容结构参考，不影响胜率）</span><span class='lg-item'><span class='rate-chip num'>85</span>= <b>综合评分</b>（驱动胜平负概率）</span>","<span class='lg-item'><span class='age-chip prime'>26.5</span>= <b>avg age</b> (squad-structure reference; does not affect odds)</span><span class='lg-item'><span class='rate-chip num'>85</span>= <b>overall rating</b> (drives win/draw/loss)</span>"],
   "t-s-lead":["小组赛完整赛程","Full Group-Stage Schedule"],
   "t-s-sub":["按比赛日排列的全部 72 场比赛，每场给出胜 / 平 / 负概率。","All 72 matches by matchday, each with win / draw / loss probabilities."],
   "t-s-n1":["胜平负概率由双方<b>综合实力评分</b>经 Elo 思路 + 平局修正模型推算。仅为数据推演，足球的魅力正在于不确定性。","Win/draw/loss odds are derived from each side's <b>overall rating</b> via an Elo-style model with a draw adjustment. This is data inference only — football's charm lies in its uncertainty."],
@@ -1062,7 +1117,7 @@ function setLang(l){
   closeModal();applyStaticI18n();
   renderGroups();renderSchedule();
   if(SIM){renderPredict();renderChampions();renderProfiles();}
-  renderDiff();renderDim();renderKnockout();renderHistory();renderScenarios();
+  renderDiff();renderDim();renderAge();renderKnockout();renderHistory();renderScenarios();
   psRenderAll();renderGames();fetchLiveWeather();
 }
 
@@ -1151,6 +1206,7 @@ function renderGroups(){
     const rows=groups[g].map(n=>{const t=TEAMS[n];
       return `<div class="team-row" onclick="openTeam('${n}')"><span class="flag">${t.f}</span>
         <span class="tname">${TN(n)}${t.host?`<span class="host-tag">${L('东道主','Host')}</span>`:''}</span>
+        <span class="age-chip ${ageTag(AGE[n]).cls}" title="${L('平均年龄','Avg age')} · ${ageTagN(AGE[n])}">${AGE[n].toFixed(1)}</span>
         <span class="rate-chip num">${t.r}</span></div>`;}).join("");
     return `<div class="group-card"><div class="group-head"><span class="g">${GP(g)}</span>
       ${g===deathGroup?`<span class="badge">${L('死亡之组','Group of Death')}</span>`:''}</div>${rows}</div>`;}).join("");
@@ -1260,7 +1316,8 @@ function renderSchedule(){
         <div class="prob-legend">
           <span><i class="dot" style="background:var(--win)"></i>${TN(h)} ${L('胜','win')} ${w}%</span>
           <span><i class="dot" style="background:var(--draw)"></i>${L('平','Draw')} ${dr}%</span>
-          <span><i class="dot" style="background:var(--loss)"></i>${TN(a)} ${L('胜','win')} ${l}%</span></div></div>`;
+          <span><i class="dot" style="background:var(--loss)"></i>${TN(a)} ${L('胜','win')} ${l}%</span></div>
+        <div class="age-line">${L('阵容年龄：','Squad age · ')}${TN(h)} <b>${AGE[h].toFixed(1)}</b> <span class="age-tag ${ageTag(AGE[h]).cls}">${ageTagN(AGE[h])}</span> · ${TN(a)} <b>${AGE[a].toFixed(1)}</b> <span class="age-tag ${ageTag(AGE[a]).cls}">${ageTagN(AGE[a])}</span> <span class="age-cav">${L('仅供参考 · 年龄不决定胜负','reference only · age does not decide the result')}</span></div></div>`;
     }).join("");
     return `<div class="day-block"><div class="day-head">
       <span class="day-date num">${LANG==="en"?dateFull(day.d):day.d.replace('月','.').replace('日','')}</span>
@@ -1314,6 +1371,28 @@ function renderDim(){
     return `<div class="dim-card"><div class="dn"><span class="didx num">${i+1}</span><span class="dt">${dd.t}</span>
       <span class="dtag ${d.done?'done':'ext'}">${d.done?L('本程序已实现','Built-in'):L('需实时数据','Needs live data')}</span></div>
       <p>${dd.p}</p></div>`;}).join("");
+}
+// 阵容年龄结构：48 队平均年龄排行（纯背景解读，不参与任何概率/胜平负计算）
+function renderAge(){
+  const card=document.getElementById("ageCard");if(!card)return;
+  const sorted=Object.keys(TEAMS).sort((a,b)=>AGE[a]-AGE[b]);
+  const vals=sorted.map(n=>AGE[n]),min=Math.min(...vals),max=Math.max(...vals);
+  const rows=sorted.map((n,i)=>{const a=AGE[n],t=TEAMS[n],tg=ageTag(a);
+    const w=Math.max(6,((a-min)/(max-min))*100).toFixed(0);
+    return `<div class="age-row" onclick="openTeam('${n}')">
+      <span class="age-rk num">${i+1}</span><span class="flag">${t.f}</span>
+      <span class="age-nm">${TN(n)}<small>${GP(t.g)}</small></span>
+      <span class="age-track"><i class="${tg.cls}" style="width:${w}%"></i></span>
+      <span class="age-val num">${a.toFixed(1)}</span>
+      <span class="age-tag ${tg.cls}">${ageTagN(a)}</span></div>`;}).join("");
+  const young=sorted[0],old=sorted[sorted.length-1];
+  const title=L('阵容年龄结构 · 48 队平均年龄','Squad Age Profile · Avg Age of 48 Teams');
+  const note=L('基于各队 26 人名单的<b>平均年龄</b>（人工快照，来源 rotowire，截至 2026-06；非官方实时）。年龄是<b>阵容结构</b>参考，<b>预测力很弱、不参与胜平负计算</b>——年轻化≠强、经验型≠弱，仅帮你理解球队风格。',"Based on each squad's 26-man <b>average age</b> (manual snapshot, source rotowire, as of 2026-06; not official live data). Age is a <b>squad-structure</b> reference with <b>very weak predictive power and is not used in win/draw/loss</b> — younger ≠ stronger, veteran ≠ weaker; it only helps you read a team's style.");
+  const ext=L(`最年轻 ${TN(young)} ${AGE[young].toFixed(1)} · 最年长 ${TN(old)} ${AGE[old].toFixed(1)}`,`Youngest ${TN(young)} ${AGE[young].toFixed(1)} · Oldest ${TN(old)} ${AGE[old].toFixed(1)}`);
+  card.innerHTML=`<div class="section-title">${title}</div>
+    <div class="note"><span class="ico">🎂</span><div>${note}</div></div>
+    <div class="age-legend"><span class="age-tag young">${L('年轻化','Young')} &lt;26.5</span><span class="age-tag prime">${L('当打之年','Prime')} 26.5–28</span><span class="age-tag vet">${L('经验型','Veteran')} &gt;28</span><span class="age-extreme">${ext}</span></div>
+    <div class="age-wrap">${rows}</div>`;
 }
 /* ============ RENDER: 历史延续性 + 淘汰赛演练 + 阵容研判 ============ */
 function bestStage(name,ed){
@@ -2067,7 +2146,7 @@ function slideRender(){
 computeDeath();
 renderWatermark();
 applyStaticI18n();
-renderGroups();renderSchedule();renderDiff();renderDim();renderKnockout();renderHistory();renderScenarios();
+renderGroups();renderSchedule();renderDiff();renderDim();renderAge();renderKnockout();renderHistory();renderScenarios();
 psLoad();psRenderAll();
 renderGames();
 simAndRender();
